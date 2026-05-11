@@ -3,69 +3,555 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Сканер штрихкода</title>
+    <title>Сканер штрихкодов</title>
     <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js"></script>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:Arial,sans-serif;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;overflow:hidden;color:#fff}
-        #scanner-container{width:100%;height:70vh}
-        video{width:100%;height:100%;object-fit:cover}
-        .controls{margin:20px;text-align:center}
-        button{padding:15px 40px;font-size:18px;font-weight:bold;background:#4f46e5;color:white;border:none;border-radius:10px;cursor:pointer;margin:0 10px}
-        button.stop{background:#ef4444}
-        .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#10b981;color:white;padding:12px 24px;border-radius:30px;font-weight:bold;display:none;z-index:1000}
-        .toast.show{display:block}
+        :root {
+            --bg: #f0f2f5;
+            --card-bg: #ffffff;
+            --text: #1a1a1a;
+            --subtext: #6b7280;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --border: #e5e7eb;
+            --radius: 16px;
+            --shadow: 0 4px 30px rgba(0,0,0,0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 16px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .scanner-widget {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+        }
+
+        .header h2 {
+            font-size: 20px;
+            font-weight: 650;
+            color: var(--text);
+            margin-bottom: 4px;
+            letter-spacing: -0.3px;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: var(--subtext);
+            margin: 0;
+        }
+
+        .viewport {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            max-height: 350px;
+            background: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #scanner-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        #scanner-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .viewport-placeholder {
+            color: #6b7280;
+            text-align: center;
+            padding: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .scan-region-highlight {
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            right: 10%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #4f46e5, #818cf8, #4f46e5, transparent);
+            border-radius: 2px;
+            box-shadow: 0 0 20px rgba(79, 70, 229, 0.6);
+            animation: scanPulse 2.2s ease-in-out infinite;
+            z-index: 10;
+            pointer-events: none;
+            display: none;
+        }
+
+        @keyframes scanPulse {
+            0%, 100% { transform: translateY(-20px); opacity: 0.6; }
+            50% { transform: translateY(20px); opacity: 1; }
+        }
+
+        .result-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .result-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--subtext);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        #barcode-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 14px;
+            font-size: 18px;
+            font-weight: 500;
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+            text-align: center;
+            letter-spacing: 1.5px;
+            background: #f9fafb;
+            color: var(--text);
+            transition: all 0.2s;
+        }
+
+        #barcode-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            flex: 1 1 auto;
+            padding: 14px 18px;
+            border: none;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-width: 100px;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: #fff;
+            color: var(--danger);
+            border: 1.5px solid #fecaca;
+        }
+
+        .btn-danger:hover {
+            background: #fef2f2;
+            border-color: var(--danger);
+            color: var(--danger-hover);
+        }
+
+        .btn-outline {
+            background: #fff;
+            color: var(--text);
+            border: 1.5px solid var(--border);
+        }
+
+        .btn-outline:hover {
+            background: #f9fafb;
+            border-color: #9ca3af;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            filter: grayscale(0.2);
+        }
+
+        .toast {
+            font-size: 13px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 500;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .toast.success {
+            background: #ecfdf5;
+            color: #065f46;
+            display: block;
+        }
+
+        .toast.error {
+            background: #fef2f2;
+            color: #991b1b;
+            display: block;
+        }
+
+        .toast.info {
+            background: #eff6ff;
+            color: #1e3a8a;
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .scan-counter {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            z-index: 20;
+            display: none;
+            letter-spacing: 0.3px;
+        }
     </style>
 </head>
 <body>
-    <div id="scanner-container"></div>
-    <div class="toast" id="toast">✅ Скопировано!</div>
-    <div class="controls">
-        <button id="start-btn" onclick="toggleScanner()">▶ Начать сканирование</button>
+    <div class="scanner-widget">
+        <div class="header">
+            <h2>📷 Сканер штрихкодов</h2>
+            <p>Наведите камеру на код</p>
+        </div>
+
+        <div class="viewport" id="viewport">
+            <div id="scanner-container"></div>
+            <div class="viewport-placeholder" id="placeholder">
+                Камера не активна
+            </div>
+            <div class="scan-region-highlight" id="scan-line"></div>
+            <div class="scan-counter" id="scan-counter"></div>
+        </div>
+
+        <div class="result-group">
+            <label>Результат сканирования</label>
+            <input type="text" id="barcode-input" placeholder="Штрихкод появится здесь" readonly>
+        </div>
+
+        <div class="toast" id="toast"></div>
+
+        <div class="actions">
+            <button class="btn btn-primary" id="start-btn">
+                ▶ Старт
+            </button>
+            <button class="btn btn-danger" id="stop-btn" disabled>
+                ⏹ Стоп
+            </button>
+            <button class="btn btn-outline" id="copy-btn" disabled>
+                📋 Копировать
+            </button>
+        </div>
     </div>
+
     <script>
-        let scannerActive=false;
-        const btn=document.getElementById('start-btn');
-        const toast=document.getElementById('toast');
-        
-        function showToast(msg){
-            toast.textContent=msg;toast.classList.add('show');
-            setTimeout(function(){toast.classList.remove('show')},2500);
-        }
-        
-        function onDetected(code){
-            if(navigator.clipboard&&navigator.clipboard.writeText){
-                navigator.clipboard.writeText(code).then(function(){
-                    showToast('✅ '+code+' скопирован!');
+        (function() {
+            const scannerContainer = document.getElementById('scanner-container');
+            const placeholder = document.getElementById('placeholder');
+            const scanLine = document.getElementById('scan-line');
+            const scanCounter = document.getElementById('scan-counter');
+            const barcodeInput = document.getElementById('barcode-input');
+            const toast = document.getElementById('toast');
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const copyBtn = document.getElementById('copy-btn');
+
+            let scannerActive = false;
+            let detectionCounts = {};
+            const CONFIRMATION_THRESHOLD = 3;
+            let quaggaInitialized = false;
+
+            function showToast(message, type = 'info') {
+                toast.textContent = message;
+                toast.className = 'toast ' + type;
+                setTimeout(function() {
+                    if (toast.textContent === message) {
+                        toast.className = 'toast';
+                    }
+                }, 4000);
+            }
+
+            function updateUIForActive(active) {
+                scannerActive = active;
+                if (active) {
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    scanLine.style.display = 'block';
+                    placeholder.style.display = 'none';
+                    startBtn.textContent = '⏳ Сканирование...';
+                } else {
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    scanLine.style.display = 'none';
+                    placeholder.style.display = 'block';
+                    startBtn.textContent = '▶ Старт';
+                    scanCounter.style.display = 'none';
+                }
+            }
+
+            function resetDetection() {
+                detectionCounts = {};
+                scanCounter.style.display = 'none';
+            }
+
+            function updateCounterDisplay(count) {
+                if (count > 0 && count < CONFIRMATION_THRESHOLD) {
+                    scanCounter.style.display = 'block';
+                    scanCounter.textContent = '🔍 ' + count + '/' + CONFIRMATION_THRESHOLD;
+                } else {
+                    scanCounter.style.display = 'none';
+                }
+            }
+
+            function onCodeConfirmed(code) {
+                barcodeInput.value = code;
+                copyBtn.disabled = false;
+                
+                // Автоматическое копирование в буфер обмена
+                copyToClipboard(code);
+                
+                showToast('✅ Штрихкод ' + code + ' найден и скопирован!', 'success');
+                
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(100);
+                }
+                
+                // Отправка результата в родительское окно
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({type: 'BARCODE_RESULT', code: code}, '*');
+                }
+                
+                stopScanner();
+            }
+
+            function copyToClipboard(text) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).catch(function(err) {
+                        console.error('Ошибка копирования:', err);
+                        fallbackCopy(text);
+                    });
+                } else {
+                    fallbackCopy(text);
+                }
+            }
+
+            function fallbackCopy(text) {
+                var textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                } catch (err) {
+                    console.error('Фолбэк копирования не сработал:', err);
+                }
+                document.body.removeChild(textarea);
+            }
+
+            function stopScanner() {
+                if (scannerActive) {
+                    try {
+                        Quagga.stop();
+                    } catch (e) {
+                        console.warn('Ошибка остановки Quagga:', e);
+                    }
+                    
+                    var video = scannerContainer.querySelector('video');
+                    if (video && video.srcObject) {
+                        video.srcObject.getTracks().forEach(function(track) {
+                            track.stop();
+                        });
+                    }
+                    
+                    scannerContainer.innerHTML = '';
+                    updateUIForActive(false);
+                    quaggaInitialized = false;
+                    resetDetection();
+                }
+            }
+
+            function startScanner() {
+                if (scannerActive) {
+                    return;
+                }
+
+                stopScanner();
+                
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    showToast('❌ Ваш браузер не поддерживает доступ к камере', 'error');
+                    return;
+                }
+
+                navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                }).then(function(tempStream) {
+                    tempStream.getTracks().forEach(function(track) {
+                        track.stop();
+                    });
+                    
+                    Quagga.init({
+                        inputStream: {
+                            name: 'Live',
+                            type: 'LiveStream',
+                            target: scannerContainer,
+                            constraints: {
+                                facingMode: 'environment',
+                                width: { min: 320, ideal: 640, max: 800 },
+                                height: { min: 240, ideal: 480, max: 600 }
+                            }
+                        },
+                        locator: {
+                            halfSample: false,
+                            patchSize: 'large'
+                        },
+                        numOfWorkers: 0,
+                        decoder: {
+                            readers: [
+                                'ean_reader',
+                                'ean_8_reader',
+                                'code_128_reader',
+                                'code_39_reader',
+                                'upc_reader',
+                                'upc_e_reader'
+                            ]
+                        },
+                        locate: true,
+                        multiple: false
+                    }, function(err) {
+                        if (err) {
+                            console.error('Ошибка инициализации Quagga:', err);
+                            showToast('❌ Не удалось запустить камеру', 'error');
+                            stopScanner();
+                            return;
+                        }
+                        
+                        Quagga.start();
+                        quaggaInitialized = true;
+                        updateUIForActive(true);
+                        resetDetection();
+                        
+                        Quagga.onDetected(function(result) {
+                            if (!result || !result.codeResult || !result.codeResult.code) return;
+                            if (!scannerActive) return;
+                            
+                            var code = result.codeResult.code;
+                            
+                            detectionCounts[code] = (detectionCounts[code] || 0) + 1;
+                            var currentCount = detectionCounts[code];
+                            
+                            updateCounterDisplay(currentCount);
+                            
+                            if (currentCount >= CONFIRMATION_THRESHOLD) {
+                                onCodeConfirmed(code);
+                            }
+                        });
+                    });
+                }).catch(function(err) {
+                    console.error('Ошибка доступа к камере:', err);
+                    showToast('❌ Нет доступа к камере', 'error');
                 });
             }
-            if(window.parent&&window.parent!==window){
-                window.parent.postMessage({type:'BARCODE_RESULT',code:code},'*');
-            }
-            stopScanner();
-        }
-        
-        function stopScanner(){
-            if(scannerActive){Quagga.stop();scannerActive=false}
-            btn.textContent='▶ Начать сканирование';btn.classList.remove('stop');
-        }
-        
-        function toggleScanner(){
-            if(scannerActive){stopScanner();return}
-            navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(stream){
-                stream.getTracks().forEach(function(t){t.stop()});
-                Quagga.init({
-                    inputStream:{name:'Live',type:'LiveStream',target:document.getElementById('scanner-container'),constraints:{facingMode:'environment'}},
-                    decoder:{readers:['ean_reader','ean_8_reader','code_128_reader','code_39_reader','upc_reader','upc_e_reader']},
-                    locate:true
-                },function(err){
-                    if(err){alert('Ошибка камеры');return}
-                    Quagga.start();scannerActive=true;
-                    btn.textContent='⏹ Остановить';btn.classList.add('stop');
-                });
-                Quagga.onDetected(function(r){if(r&&r.codeResult&&r.codeResult.code)onDetected(r.codeResult.code)});
-            }).catch(function(){alert('Нет доступа к камере')});
-        }
+
+            startBtn.addEventListener('click', startScanner);
+            stopBtn.addEventListener('click', stopScanner);
+            
+            copyBtn.addEventListener('click', function() {
+                var code = barcodeInput.value;
+                if (!code) return;
+                
+                copyToClipboard(code);
+                
+                var origText = copyBtn.textContent;
+                copyBtn.textContent = '✅ Скопировано!';
+                copyBtn.style.background = '#ecfdf5';
+                copyBtn.style.color = '#065f46';
+                copyBtn.style.borderColor = '#a7f3d0';
+                
+                setTimeout(function() {
+                    copyBtn.textContent = origText;
+                    copyBtn.style.background = '#fff';
+                    copyBtn.style.color = '#1a1a1a';
+                    copyBtn.style.borderColor = '#e5e7eb';
+                }, 2000);
+            });
+
+            window.addEventListener('beforeunload', function() {
+                if (scannerActive) {
+                    stopScanner();
+                }
+            });
+        })();
     </script>
 </body>
 </html>

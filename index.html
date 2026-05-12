@@ -255,274 +255,299 @@
         </div>
     </div>
 
-    <script>
-        (function() {
-            const scannerContainer = document.getElementById('scanner-container');
-            const placeholder = document.getElementById('placeholder');
-            const scanLine = document.getElementById('scan-line');
-            const scanCounter = document.getElementById('scan-counter');
-            const barcodeInput = document.getElementById('barcode-input');
-            const toast = document.getElementById('toast');
-            const startBtn = document.getElementById('start-btn');
-            const stopBtn = document.getElementById('stop-btn');
-            const copyBtn = document.getElementById('copy-btn');
+<script>
+    (function() {
+        const scannerContainer = document.getElementById('scanner-container');
+        const placeholder = document.getElementById('placeholder');
+        const scanLine = document.getElementById('scan-line');
+        const scanCounter = document.getElementById('scan-counter');
+        const barcodeInput = document.getElementById('barcode-input');
+        const toast = document.getElementById('toast');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const copyBtn = document.getElementById('copy-btn');
 
-            let scannerActive = false;
-            let detectionCounts = {};
-            let lastDetectedTime = {};
-            const CONFIRMATION_THRESHOLD = 3;
-            const DETECTION_DELAY = 300; // 0.3 секунды между подтверждениями
+        let scannerActive = false;
+        let detectionCounts = {};
+        let lastDetectedTime = {};
+        const CONFIRMATION_THRESHOLD = 3;
+        const DETECTION_DELAY = 300;
 
-            function showToast(message, type) {
-                toast.textContent = message;
-                toast.className = 'toast ' + (type || 'success');
-                setTimeout(function() {
-                    toast.className = 'toast';
-                }, 3000);
-            }
+        function showToast(message, type) {
+            toast.textContent = message;
+            toast.className = 'toast ' + (type || 'success');
+            setTimeout(function() {
+                toast.className = 'toast';
+            }, 3000);
+        }
 
-            function updateUIForActive(active) {
-                scannerActive = active;
-                if (active) {
-                    startBtn.disabled = true;
-                    stopBtn.disabled = false;
-                    scanLine.style.display = 'block';
-                    placeholder.style.display = 'none';
-                    startBtn.textContent = '⏳ Скан...';
-                } else {
-                    startBtn.disabled = false;
-                    stopBtn.disabled = true;
-                    scanLine.style.display = 'none';
-                    placeholder.style.display = 'block';
-                    startBtn.textContent = '▶ Старт';
-                    scanCounter.style.display = 'none';
-                    scanCounter.classList.remove('confirmed');
-                }
-            }
-
-            function resetDetection() {
-                detectionCounts = {};
-                lastDetectedTime = {};
+        function updateUIForActive(active) {
+            scannerActive = active;
+            if (active) {
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                scanLine.style.display = 'block';
+                placeholder.style.display = 'none';
+                startBtn.textContent = '⏳ Скан...';
+            } else {
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                scanLine.style.display = 'none';
+                placeholder.style.display = 'block';
+                startBtn.textContent = '▶ Старт';
                 scanCounter.style.display = 'none';
                 scanCounter.classList.remove('confirmed');
             }
+        }
 
-            function updateCounterDisplay(count) {
-                if (count > 0 && count < CONFIRMATION_THRESHOLD) {
-                    scanCounter.style.display = 'block';
-                    scanCounter.classList.remove('confirmed');
-                    scanCounter.textContent = '🔍 ' + count + '/' + CONFIRMATION_THRESHOLD;
-                } else if (count >= CONFIRMATION_THRESHOLD) {
-                    scanCounter.style.display = 'block';
-                    scanCounter.classList.add('confirmed');
-                    scanCounter.textContent = '✅ Готово!';
-                } else {
-                    scanCounter.style.display = 'none';
-                    scanCounter.classList.remove('confirmed');
-                }
+        function resetDetection() {
+            detectionCounts = {};
+            lastDetectedTime = {};
+            scanCounter.style.display = 'none';
+            scanCounter.classList.remove('confirmed');
+        }
+
+        function updateCounterDisplay(count) {
+            if (count > 0 && count < CONFIRMATION_THRESHOLD) {
+                scanCounter.style.display = 'block';
+                scanCounter.classList.remove('confirmed');
+                scanCounter.textContent = '🔍 ' + count + '/' + CONFIRMATION_THRESHOLD;
+            } else if (count >= CONFIRMATION_THRESHOLD) {
+                scanCounter.style.display = 'block';
+                scanCounter.classList.add('confirmed');
+                scanCounter.textContent = '✅ Готово!';
+            } else {
+                scanCounter.style.display = 'none';
+                scanCounter.classList.remove('confirmed');
             }
+        }
 
-            // Надёжная функция копирования для всех устройств
-            function copyToClipboard(text, callback) {
-                // Способ 1: Современный API
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(text).then(function() {
-                        if (callback) callback(true);
-                    }).catch(function() {
-                        fallbackCopy(text, callback);
-                    });
-                } else {
-                    // Способ 2: Фолбэк
-                    fallbackCopy(text, callback);
-                }
-            }
-
-            function fallbackCopy(text, callback) {
-                var input = document.createElement('input');
-                input.type = 'text';
-                input.value = text;
-                input.style.position = 'fixed';
-                input.style.top = '0';
-                input.style.left = '0';
-                input.style.width = '2em';
-                input.style.height = '2em';
-                input.style.padding = '0';
-                input.style.border = 'none';
-                input.style.outline = 'none';
-                input.style.boxShadow = 'none';
-                input.style.background = 'transparent';
-                input.style.fontSize = '16px';
-                input.style.color = 'transparent';
-                input.style.opacity = '0';
-                input.style.pointerEvents = 'none';
-                input.style.zIndex = '-1';
-                
-                document.body.appendChild(input);
-                
-                input.focus();
-                input.select();
-                input.setSelectionRange(0, 9999);
-                
-                var success = false;
-                try {
-                    success = document.execCommand('copy');
-                } catch(e) {
-                    console.error('Фолбэк копирования не сработал:', e);
-                }
-                
-                document.body.removeChild(input);
-                
-                if (callback) callback(success);
-            }
-
-            function onCodeConfirmed(code) {
-                barcodeInput.value = code;
-                copyBtn.disabled = false;
-                
-                // Автоматическое копирование
-                copyToClipboard(code, function(success) {
-                    if (success) {
-                        showToast('✅ ' + code + ' — скопирован!', 'success');
-                    } else {
-                        showToast('⚠ Штрихкод: ' + code + '. Нажмите Копировать', 'error');
-                    }
+        // УНИВЕРСАЛЬНАЯ ФУНКЦИЯ КОПИРОВАНИЯ — ИСПРАВЛЕНА ДЛЯ ANDROID
+        function copyToClipboard(text, callback) {
+            // Пробуем современный API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    if (callback) callback(true);
+                }).catch(function() {
+                    // Не сработало — пробуем фолбэк
+                    androidCopyFallback(text, callback);
                 });
-                
-                if (window.navigator && window.navigator.vibrate) {
-                    window.navigator.vibrate([100, 50, 100]); // Двойная вибрация при подтверждении
-                }
-                
-                if (window.parent && window.parent !== window) {
-                    window.parent.postMessage({type: 'BARCODE_RESULT', code: code}, '*');
-                }
-                
-                stopScanner();
+            } else {
+                // Сразу фолбэк
+                androidCopyFallback(text, callback);
             }
+        }
 
-            function stopScanner() {
-                if (scannerActive) {
+        // СПЕЦИАЛЬНЫЙ ФОЛБЭК ДЛЯ ANDROID
+        function androidCopyFallback(text, callback) {
+            // Используем существующее поле ввода — оно видимое!
+            var originalValue = barcodeInput.value;
+            var originalReadOnly = barcodeInput.readOnly;
+            
+            // Временно делаем поле редактируемым
+            barcodeInput.readOnly = false;
+            barcodeInput.value = text;
+            
+            // Фокусируем и выделяем
+            barcodeInput.focus();
+            barcodeInput.select();
+            barcodeInput.setSelectionRange(0, 9999);
+            
+            var success = false;
+            try {
+                success = document.execCommand('copy');
+            } catch(e) {
+                console.error('Ошибка копирования:', e);
+            }
+            
+            // Возвращаем как было
+            barcodeInput.readOnly = originalReadOnly;
+            barcodeInput.value = originalValue;
+            
+            // Если не сработало — последний шанс через textarea
+            if (!success) {
+                var textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.top = '0';
+                textarea.style.left = '0';
+                textarea.style.width = '100%';
+                textarea.style.height = '100px';
+                textarea.style.opacity = '0.01'; // Почти невидимо, но не display:none
+                textarea.style.zIndex = '9999';
+                textarea.style.fontSize = '16px';
+                
+                document.body.appendChild(textarea);
+                
+                // Даём браузеру время на рендер
+                setTimeout(function() {
+                    textarea.focus();
+                    textarea.select();
+                    textarea.setSelectionRange(0, 9999);
+                    
                     try {
-                        Quagga.stop();
-                    } catch(e) {}
-                    
-                    var video = scannerContainer.querySelector('video');
-                    if (video && video.srcObject) {
-                        video.srcObject.getTracks().forEach(function(t) { t.stop(); });
+                        success = document.execCommand('copy');
+                    } catch(e) {
+                        console.error('Финальная ошибка копирования:', e);
                     }
-                    scannerContainer.innerHTML = '';
-                    updateUIForActive(false);
-                    resetDetection();
+                    
+                    document.body.removeChild(textarea);
+                    
+                    if (callback) callback(success);
+                }, 100);
+                
+                return; // Выходим, callback будет вызван в setTimeout
+            }
+            
+            if (callback) callback(success);
+        }
+
+        function onCodeConfirmed(code) {
+            barcodeInput.value = code;
+            copyBtn.disabled = false;
+            
+            // Автоматическое копирование
+            copyToClipboard(code, function(success) {
+                if (success) {
+                    showToast('✅ ' + code + ' — скопирован!', 'success');
+                } else {
+                    showToast('⚠ Штрихкод: ' + code + '. Нажмите Копировать', 'error');
                 }
+            });
+            
+            if (window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate([100, 50, 100]);
+            }
+            
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({type: 'BARCODE_RESULT', code: code}, '*');
+            }
+            
+            stopScanner();
+        }
+
+        function stopScanner() {
+            if (scannerActive) {
+                try {
+                    Quagga.stop();
+                } catch(e) {}
+                
+                var video = scannerContainer.querySelector('video');
+                if (video && video.srcObject) {
+                    video.srcObject.getTracks().forEach(function(t) { t.stop(); });
+                }
+                scannerContainer.innerHTML = '';
+                updateUIForActive(false);
+                resetDetection();
+            }
+        }
+
+        function startScanner() {
+            if (scannerActive) return;
+            stopScanner();
+            
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showToast('❌ Камера не поддерживается', 'error');
+                return;
             }
 
-            function startScanner() {
-                if (scannerActive) return;
-                stopScanner();
-                
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    showToast('❌ Камера не поддерживается', 'error');
-                    return;
+            navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: 'environment',
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
                 }
-
-                navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
+            }).then(function(tempStream) {
+                tempStream.getTracks().forEach(function(t) { t.stop(); });
+                
+                Quagga.init({
+                    inputStream: {
+                        name: 'Live',
+                        type: 'LiveStream',
+                        target: scannerContainer,
+                        constraints: {
+                            facingMode: 'environment',
+                            width: { min: 320, ideal: 640, max: 800 },
+                            height: { min: 240, ideal: 480, max: 600 }
+                        }
+                    },
+                    locator: { halfSample: false, patchSize: 'large' },
+                    numOfWorkers: 0,
+                    decoder: {
+                        readers: ['ean_reader','ean_8_reader','code_128_reader','code_39_reader','upc_reader','upc_e_reader']
+                    },
+                    locate: true,
+                    multiple: false
+                }, function(err) {
+                    if (err) {
+                        showToast('❌ Ошибка камеры', 'error');
+                        stopScanner();
+                        return;
                     }
-                }).then(function(tempStream) {
-                    tempStream.getTracks().forEach(function(t) { t.stop(); });
+                    Quagga.start();
+                    updateUIForActive(true);
+                    resetDetection();
                     
-                    Quagga.init({
-                        inputStream: {
-                            name: 'Live',
-                            type: 'LiveStream',
-                            target: scannerContainer,
-                            constraints: {
-                                facingMode: 'environment',
-                                width: { min: 320, ideal: 640, max: 800 },
-                                height: { min: 240, ideal: 480, max: 600 }
-                            }
-                        },
-                        locator: { halfSample: false, patchSize: 'large' },
-                        numOfWorkers: 0,
-                        decoder: {
-                            readers: ['ean_reader','ean_8_reader','code_128_reader','code_39_reader','upc_reader','upc_e_reader']
-                        },
-                        locate: true,
-                        multiple: false
-                    }, function(err) {
-                        if (err) {
-                            showToast('❌ Ошибка камеры', 'error');
-                            stopScanner();
+                    Quagga.onDetected(function(result) {
+                        if (!result || !result.codeResult || !result.codeResult.code) return;
+                        if (!scannerActive) return;
+                        
+                        var code = result.codeResult.code;
+                        var now = Date.now();
+                        
+                        if (lastDetectedTime[code] && (now - lastDetectedTime[code] < DETECTION_DELAY)) {
                             return;
                         }
-                        Quagga.start();
-                        updateUIForActive(true);
-                        resetDetection();
                         
-                        Quagga.onDetected(function(result) {
-                            if (!result || !result.codeResult || !result.codeResult.code) return;
-                            if (!scannerActive) return;
-                            
-                            var code = result.codeResult.code;
-                            var now = Date.now();
-                            
-                            // Проверка задержки между срабатываниями (0.3 секунды)
-                            if (lastDetectedTime[code] && (now - lastDetectedTime[code] < DETECTION_DELAY)) {
-                                return; // Ещё рано, пропускаем
-                            }
-                            
-                            lastDetectedTime[code] = now;
-                            detectionCounts[code] = (detectionCounts[code] || 0) + 1;
-                            
-                            updateCounterDisplay(detectionCounts[code]);
-                            
-                            if (detectionCounts[code] >= CONFIRMATION_THRESHOLD) {
-                                // Задержка перед подтверждением для анимации
-                                setTimeout(function() {
-                                    if (scannerActive) {
-                                        onCodeConfirmed(code);
-                                    }
-                                }, 200);
-                            }
-                        });
+                        lastDetectedTime[code] = now;
+                        detectionCounts[code] = (detectionCounts[code] || 0) + 1;
+                        
+                        updateCounterDisplay(detectionCounts[code]);
+                        
+                        if (detectionCounts[code] >= CONFIRMATION_THRESHOLD) {
+                            setTimeout(function() {
+                                if (scannerActive) {
+                                    onCodeConfirmed(code);
+                                }
+                            }, 200);
+                        }
                     });
-                }).catch(function() {
-                    showToast('❌ Нет доступа к камере', 'error');
                 });
-            }
+            }).catch(function() {
+                showToast('❌ Нет доступа к камере', 'error');
+            });
+        }
 
-            startBtn.addEventListener('click', startScanner);
-            stopBtn.addEventListener('click', stopScanner);
+        startBtn.addEventListener('click', startScanner);
+        stopBtn.addEventListener('click', stopScanner);
+        
+        copyBtn.addEventListener('click', function() {
+            var code = barcodeInput.value;
+            if (!code) return;
             
-            copyBtn.addEventListener('click', function() {
-                var code = barcodeInput.value;
-                if (!code) return;
-                
-                copyToClipboard(code, function(success) {
-                    if (success) {
-                        var origText = copyBtn.textContent;
-                        copyBtn.textContent = '✅ Скопировано!';
-                        copyBtn.style.background = '#ecfdf5';
-                        copyBtn.style.color = '#065f46';
-                        copyBtn.style.borderColor = '#a7f3d0';
-                        setTimeout(function() {
-                            copyBtn.textContent = origText;
-                            copyBtn.style.background = '#fff';
-                            copyBtn.style.color = '#1a1a1a';
-                            copyBtn.style.borderColor = '#e5e7eb';
-                        }, 1500);
-                    } else {
-                        showToast('❌ Не удалось скопировать', 'error');
-                    }
-                });
+            copyToClipboard(code, function(success) {
+                if (success) {
+                    var origText = copyBtn.textContent;
+                    copyBtn.textContent = '✅ Скопировано!';
+                    copyBtn.style.background = '#ecfdf5';
+                    copyBtn.style.color = '#065f46';
+                    copyBtn.style.borderColor = '#a7f3d0';
+                    setTimeout(function() {
+                        copyBtn.textContent = origText;
+                        copyBtn.style.background = '#fff';
+                        copyBtn.style.color = '#1a1a1a';
+                        copyBtn.style.borderColor = '#e5e7eb';
+                    }, 1500);
+                } else {
+                    showToast('❌ Не удалось скопировать', 'error');
+                }
             });
+        });
 
-            window.addEventListener('beforeunload', function() {
-                if (scannerActive) stopScanner();
-            });
-        })();
-    </script>
+        window.addEventListener('beforeunload', function() {
+            if (scannerActive) stopScanner();
+        });
+    })();
+</script>
 </body>
 </html>

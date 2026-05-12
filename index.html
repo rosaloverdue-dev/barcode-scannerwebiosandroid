@@ -209,13 +209,25 @@
             position: absolute;
             bottom: 4px;
             right: 6px;
-            background: rgba(0,0,0,0.7);
+            background: rgba(79, 70, 229, 0.9);
             color: white;
-            padding: 2px 8px;
+            padding: 3px 10px;
             border-radius: 10px;
             font-size: 10px;
+            font-weight: 600;
             z-index: 20;
             display: none;
+        }
+
+        .scan-counter.confirmed {
+            background: rgba(16, 185, 129, 0.9);
+            animation: popIn 0.3s ease;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
         }
     </style>
 </head>
@@ -257,7 +269,9 @@
 
             let scannerActive = false;
             let detectionCounts = {};
+            let lastDetectedTime = {};
             const CONFIRMATION_THRESHOLD = 3;
+            const DETECTION_DELAY = 300; // 0.3 секунды между подтверждениями
 
             function showToast(message, type) {
                 toast.textContent = message;
@@ -282,41 +296,48 @@
                     placeholder.style.display = 'block';
                     startBtn.textContent = '▶ Старт';
                     scanCounter.style.display = 'none';
+                    scanCounter.classList.remove('confirmed');
                 }
             }
 
             function resetDetection() {
                 detectionCounts = {};
+                lastDetectedTime = {};
                 scanCounter.style.display = 'none';
+                scanCounter.classList.remove('confirmed');
             }
 
             function updateCounterDisplay(count) {
                 if (count > 0 && count < CONFIRMATION_THRESHOLD) {
                     scanCounter.style.display = 'block';
-                    scanCounter.textContent = count + '/' + CONFIRMATION_THRESHOLD;
+                    scanCounter.classList.remove('confirmed');
+                    scanCounter.textContent = '🔍 ' + count + '/' + CONFIRMATION_THRESHOLD;
+                } else if (count >= CONFIRMATION_THRESHOLD) {
+                    scanCounter.style.display = 'block';
+                    scanCounter.classList.add('confirmed');
+                    scanCounter.textContent = '✅ Готово!';
                 } else {
                     scanCounter.style.display = 'none';
+                    scanCounter.classList.remove('confirmed');
                 }
             }
 
             // Надёжная функция копирования для всех устройств
             function copyToClipboard(text, callback) {
-                // Способ 1: Современный API (работает на iOS 14+ и Android 6+)
+                // Способ 1: Современный API
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(text).then(function() {
                         if (callback) callback(true);
                     }).catch(function() {
-                        // Если API не сработал, пробуем фолбэк
                         fallbackCopy(text, callback);
                     });
                 } else {
-                    // Способ 2: Фолбэк для старых браузеров и Android
+                    // Способ 2: Фолбэк
                     fallbackCopy(text, callback);
                 }
             }
 
             function fallbackCopy(text, callback) {
-                // Создаём временное поле
                 var input = document.createElement('input');
                 input.type = 'text';
                 input.value = text;
@@ -338,10 +359,9 @@
                 
                 document.body.appendChild(input);
                 
-                // Для Android важен фокус и выделение
                 input.focus();
                 input.select();
-                input.setSelectionRange(0, 9999); // Для мобильных
+                input.setSelectionRange(0, 9999);
                 
                 var success = false;
                 try {
@@ -369,7 +389,7 @@
                 });
                 
                 if (window.navigator && window.navigator.vibrate) {
-                    window.navigator.vibrate(100);
+                    window.navigator.vibrate([100, 50, 100]); // Двойная вибрация при подтверждении
                 }
                 
                 if (window.parent && window.parent !== window) {
@@ -446,11 +466,25 @@
                             if (!scannerActive) return;
                             
                             var code = result.codeResult.code;
+                            var now = Date.now();
+                            
+                            // Проверка задержки между срабатываниями (0.3 секунды)
+                            if (lastDetectedTime[code] && (now - lastDetectedTime[code] < DETECTION_DELAY)) {
+                                return; // Ещё рано, пропускаем
+                            }
+                            
+                            lastDetectedTime[code] = now;
                             detectionCounts[code] = (detectionCounts[code] || 0) + 1;
+                            
                             updateCounterDisplay(detectionCounts[code]);
                             
                             if (detectionCounts[code] >= CONFIRMATION_THRESHOLD) {
-                                onCodeConfirmed(code);
+                                // Задержка перед подтверждением для анимации
+                                setTimeout(function() {
+                                    if (scannerActive) {
+                                        onCodeConfirmed(code);
+                                    }
+                                }, 200);
                             }
                         });
                     });

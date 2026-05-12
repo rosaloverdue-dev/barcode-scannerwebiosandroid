@@ -299,29 +299,60 @@
                 }
             }
 
-            // Функция копирования (возвращает true если успешно)
+            // Надёжная функция копирования для всех устройств
             function copyToClipboard(text, callback) {
+                // Способ 1: Современный API (работает на iOS 14+ и Android 6+)
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(text).then(function() {
                         if (callback) callback(true);
                     }).catch(function() {
-                        if (callback) callback(false);
+                        // Если API не сработал, пробуем фолбэк
+                        fallbackCopy(text, callback);
                     });
                 } else {
-                    // Фолбэк
-                    var ta = document.createElement('textarea');
-                    ta.value = text;
-                    ta.style.position = 'fixed';
-                    ta.style.opacity = '0';
-                    document.body.appendChild(ta);
-                    ta.select();
-                    var success = false;
-                    try {
-                        success = document.execCommand('copy');
-                    } catch(e) {}
-                    document.body.removeChild(ta);
-                    if (callback) callback(success);
+                    // Способ 2: Фолбэк для старых браузеров и Android
+                    fallbackCopy(text, callback);
                 }
+            }
+
+            function fallbackCopy(text, callback) {
+                // Создаём временное поле
+                var input = document.createElement('input');
+                input.type = 'text';
+                input.value = text;
+                input.style.position = 'fixed';
+                input.style.top = '0';
+                input.style.left = '0';
+                input.style.width = '2em';
+                input.style.height = '2em';
+                input.style.padding = '0';
+                input.style.border = 'none';
+                input.style.outline = 'none';
+                input.style.boxShadow = 'none';
+                input.style.background = 'transparent';
+                input.style.fontSize = '16px';
+                input.style.color = 'transparent';
+                input.style.opacity = '0';
+                input.style.pointerEvents = 'none';
+                input.style.zIndex = '-1';
+                
+                document.body.appendChild(input);
+                
+                // Для Android важен фокус и выделение
+                input.focus();
+                input.select();
+                input.setSelectionRange(0, 9999); // Для мобильных
+                
+                var success = false;
+                try {
+                    success = document.execCommand('copy');
+                } catch(e) {
+                    console.error('Фолбэк копирования не сработал:', e);
+                }
+                
+                document.body.removeChild(input);
+                
+                if (callback) callback(success);
             }
 
             function onCodeConfirmed(code) {
@@ -448,6 +479,8 @@
                             copyBtn.style.color = '#1a1a1a';
                             copyBtn.style.borderColor = '#e5e7eb';
                         }, 1500);
+                    } else {
+                        showToast('❌ Не удалось скопировать', 'error');
                     }
                 });
             });

@@ -2,243 +2,46 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>VK Mini App - Загрузка</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Перенаправление...</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            margin: 0;
             display: flex;
-            align-items: center;
             justify-content: center;
-            position: relative;
+            align-items: center;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        
-        .loader-container {
+        .loader {
             text-align: center;
             padding: 20px;
+            color: white;
         }
-        
         .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #ffffff;
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: white;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+            margin: 0 auto 15px;
         }
-        
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .status {
-            color: white;
-            font-size: 16px;
-            margin-top: 20px;
-            opacity: 0.9;
-        }
-        
-        .error-message {
-            background: rgba(255, 255, 255, 0.95);
-            color: #e74c3c;
-            padding: 20px;
-            border-radius: 12px;
-            max-width: 300px;
-            margin: 0 auto;
-            text-align: center;
-        }
-        
-        .error-message h3 {
-            margin-bottom: 10px;
-            font-size: 18px;
-        }
-        
-        .error-message p {
-            font-size: 14px;
-            margin-bottom: 15px;
-        }
-        
-        .error-message button {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-        
-        iframe {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: none;
-            z-index: 1000;
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <div class="loader-container" id="loader">
+    <div class="loader">
         <div class="spinner"></div>
-        <div class="status" id="statusText">Подключение к ВКонтакте...</div>
+        <div>Перенаправление в приложение...</div>
     </div>
 
     <script>
-        // URL вашего сайта, который будет открыт в iframe
-        const TARGET_URL = 'https://alcorosal.ru/vk.html';
-        
-        let initAttempts = 0;
-        const MAX_ATTEMPTS = 5;
-        
-        function updateStatus(message) {
-            const statusEl = document.getElementById('statusText');
-            if (statusEl) {
-                statusEl.textContent = message;
-            }
-            console.log('[VK] ' + message);
-        }
-        
-        function showError(message) {
-            const container = document.getElementById('loader');
-            container.innerHTML = `
-                <div class="error-message">
-                    <h3>❌ Ошибка</h3>
-                    <p>${message}</p>
-                    <button onclick="location.reload()">🔄 Повторить</button>
-                </div>
-            `;
-        }
-        
-        function loadTargetSite() {
-            updateStatus('Загрузка приложения...');
-            
-            const iframe = document.createElement('iframe');
-            iframe.src = TARGET_URL;
-            iframe.setAttribute('allow', 'clipboard-read; clipboard-write');
-            
-            document.body.innerHTML = '';
-            document.body.appendChild(iframe);
-            
-            iframe.onload = function() {
-                console.log('[VK] Сайт загружен');
-            };
-            
-            iframe.onerror = function() {
-                console.error('[VK] Ошибка загрузки сайта');
-                document.body.innerHTML = '';
-                document.body.appendChild(document.createElement('div'));
-                showError('Не удалось загрузить приложение. Проверьте соединение.');
-            };
-        }
-        
-        function initVKApp() {
-            updateStatus('Инициализация VK Bridge...');
-            
-            // Проверяем наличие VK Bridge
-            if (typeof window.vkBridge === 'undefined') {
-                if (initAttempts < MAX_ATTEMPTS) {
-                    initAttempts++;
-                    updateStatus(`Ожидание VK Bridge (попытка ${initAttempts}/${MAX_ATTEMPTS})...`);
-                    setTimeout(initVKApp, 500);
-                    return;
-                }
-                // Если VK Bridge не загрузился, всё равно загружаем сайт
-                updateStatus('VK Bridge не загружен, загружаем приложение...');
-                setTimeout(loadTargetSite, 500);
-                return;
-            }
-            
-            updateStatus('Отправка сигнала инициализации...');
-            
-            // Отправляем сигнал инициализации с таймаутом
-            Promise.race([
-                window.vkBridge.send('VKWebAppInit'),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
-            ])
-            .then(() => {
-                updateStatus('VK инициализирован, получаем данные пользователя...');
-                return window.vkBridge.send('VKWebAppGetUserInfo');
-            })
-            .then((userInfo) => {
-                if (userInfo && userInfo.first_name) {
-                    updateStatus(`Привет, ${userInfo.first_name}! Загрузка...`);
-                    console.log('[VK] Пользователь:', userInfo.id, userInfo.first_name);
-                } else {
-                    updateStatus('Успешная инициализация! Загрузка...');
-                }
-                setTimeout(loadTargetSite, 500);
-            })
-            .catch((error) => {
-                console.error('[VK] Ошибка инициализации:', error);
-                updateStatus('Пропускаем VK инициализацию, загружаем приложение...');
-                setTimeout(loadTargetSite, 500);
-            });
-        }
-        
-        function loadVKBridge() {
-            updateStatus('Загрузка VK Bridge...');
-            
-            // Пытаемся загрузить VK Bridge из разных источников
-            const sources = [
-                'https://vk.com/js/api/bridge/bridge.min.js',
-                'https://unpkg.com/@vkontakte/vk-bridge@2.0.3/dist/browser.min.js',
-                'https://cdn.jsdelivr.net/npm/@vkontakte/vk-bridge@2.0.3/dist/browser.min.js'
-            ];
-            
-            let currentSource = 0;
-            
-            function tryLoadSource() {
-                if (currentSource >= sources.length) {
-                    console.warn('[VK] Все источники загрузки не сработали, загружаем сайт без VK Bridge');
-                    loadTargetSite();
-                    return;
-                }
-                
-                updateStatus(`Загрузка VK Bridge (источник ${currentSource + 1}/${sources.length})...`);
-                
-                const script = document.createElement('script');
-                script.src = sources[currentSource];
-                script.onload = function() {
-                    console.log('[VK] VK Bridge загружен из:', sources[currentSource]);
-                    setTimeout(function() {
-                        if (typeof window.vkBridge !== 'undefined') {
-                            initVKApp();
-                        } else {
-                            console.log('[VK] vkBridge не определён, пробуем следующий источник');
-                            currentSource++;
-                            tryLoadSource();
-                        }
-                    }, 100);
-                };
-                script.onerror = function() {
-                    console.log('[VK] Ошибка загрузки из:', sources[currentSource]);
-                    currentSource++;
-                    tryLoadSource();
-                };
-                document.head.appendChild(script);
-            }
-            
-            tryLoadSource();
-        }
-        
-        // Запускаем загрузку
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', loadVKBridge);
-        } else {
-            loadVKBridge();
-        }
+        // Прямое перенаправление на ваш сайт
+        window.location.href = 'https://alcorosal.ru/vk.html';
     </script>
 </body>
 </html>

@@ -2,46 +2,168 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Перенаправление...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Загрузка приложения...</title>
     <style>
-        body {
+        * {
             margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: system-ui, -apple-system, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 0;
+            box-sizing: border-box;
         }
-        .loader {
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
             text-align: center;
             padding: 20px;
-            color: white;
         }
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-top-color: white;
+        
+        .loader {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ffffff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
+            margin-bottom: 20px;
         }
+        
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status {
+            color: white;
+            font-size: 16px;
+            margin-top: 20px;
+            opacity: 0.9;
+        }
+        
+        .error {
+            background: rgba(255, 255, 255, 0.95);
+            color: #e74c3c;
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        
+        .error h3 {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        .error p {
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .error button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="loader">
-        <div class="spinner"></div>
-        <div>Перенаправление в приложение...</div>
+    <div class="container" id="app">
+        <div class="loader"></div>
+        <div class="status">Инициализация приложения...</div>
     </div>
 
+    <script src="https://unpkg.com/@vkontakte/vk-bridge@2.0.3/dist/browser.min.js"></script>
+    
     <script>
-        // Прямое перенаправление на ваш сайт
-        window.location.href = 'https://alcorosal.ru/vk.html';
+        const TARGET_URL = 'https://alcorosal.ru/admin';
+        
+        let vkBridge;
+        
+        function redirectToApp() {
+            const container = document.getElementById('app');
+            container.innerHTML = `
+                <div class="status">Перенаправление в приложение...</div>
+            `;
+            window.location.href = TARGET_URL;
+        }
+        
+        function showError(message) {
+            const container = document.getElementById('app');
+            container.innerHTML = `
+                <div class="error">
+                    <h3>❌ Ошибка</h3>
+                    <p>${message}</p>
+                    <button onclick="location.reload()">🔄 Повторить</button>
+                </div>
+            `;
+        }
+        
+        function initVKApp() {
+            const isVK = window.location.search.includes('vk_access_token') || 
+                        window.location.hash.includes('vk_access_token') ||
+                        document.referrer.includes('vk.com');
+            
+            if (typeof window.vkBridge !== 'undefined') {
+                vkBridge = window.vkBridge;
+            } else if (typeof window.vkbridgenew !== 'undefined') {
+                vkBridge = window.vkbridgenew;
+            } else {
+                if (!isVK) {
+                    redirectToApp();
+                    return;
+                }
+                showError('Не удалось загрузить VK Bridge');
+                return;
+            }
+            
+            vkBridge.send('VKWebAppInit')
+                .then(() => {
+                    const statusDiv = document.querySelector('.status');
+                    if (statusDiv) {
+                        statusDiv.textContent = 'Подключение к серверу...';
+                    }
+                    return vkBridge.send('VKWebAppGetUserInfo');
+                })
+                .then((userInfo) => {
+                    if (userInfo && userInfo.first_name) {
+                        console.log(`Привет, ${userInfo.first_name}!`);
+                    }
+                    setTimeout(() => {
+                        redirectToApp();
+                    }, 1000);
+                })
+                .catch((error) => {
+                    if (isVK) {
+                        setTimeout(() => {
+                            redirectToApp();
+                        }, 500);
+                    } else {
+                        showError('Не удалось инициализировать приложение');
+                    }
+                });
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initVKApp);
+        } else {
+            initVKApp();
+        }
     </script>
 </body>
 </html>
